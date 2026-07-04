@@ -10,10 +10,16 @@ Unplanned power outages are a common problem in many regions, but there's often 
 
 - **/report** — Log a power outage in your area
 - **/status** — View recent outage/restoration reports for any area
-- **/restored** — Mark power as back on in /subscribe/subscribe** — Get notified automatically when someone reports an outage in an area you c/help
-- **/help** — List all availableAdmin alertsmin alerts** — Reports and restorations are pushed in real time to admin accounts for monitoring
+- **/restored** — Mark power as back on in your area
+- **subscribe** — Get notified automatically when someone reports an outage in an area you care about
+- **/help** — List all available commands
+- **Admin alerts** — Reports and restorations are pushed in real time to admin accounts for monitoring
 
-## TePython 3**Python 3** — corepython-telegram-botlegram-bot** — Telegram Bot APSQLite- **SQLite** — lightweight local database for reports and subsRailway **Railway** — cloud hosting, running 24/7 independent of any local machine
+## Tech Stack
+- **Python 3** — core language
+- **python-telegram-bot** — Telegram Bot API wrapper
+- **SQLite** — lightweight local database for reports and subscriptions
+- **Railway** — cloud hosting, running 24/7 independent of any local machine
 
 ## How It Works
 
