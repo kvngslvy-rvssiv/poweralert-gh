@@ -186,6 +186,18 @@ async def restored_area(update: Update, context: ContextTypes.DEFAULT_TYPE):
     area = update.message.text
     user = update.effective_user
     add_report(user.id, user.username or user.first_name, area, "restored")
+
+    try:
+        reporter_name = user.username or user.first_name or "Unknown"
+        await context.bot.send_message(
+            ADMIN_ID,
+            "ADMIN ALERT\nPower restored\nArea: " + area.strip().title() + 
+            "\nReported by: " + reporter_name + 
+            "\nTime: " + datetime.now().strftime("%Y-%m-%d %H:%M")
+        )
+    except Exception as e:
+        logger.warning("Could not notify admin: " + str(e))
+        
     await update.message.reply_text("Marked as restored for " + area.strip().title() + ". Good news!")
     return ConversationHandler.END
 
