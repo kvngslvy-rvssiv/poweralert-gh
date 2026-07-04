@@ -19,9 +19,13 @@ from telegram.ext import (
 
 import os
 BOT_TOKEN = "8093500509:AAFBbSe_AkWGXI6Bgp2jB6cv0WoDSu7Awk0"
-
-
 DB_PATH = "poweralert.db"
+
+import os
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+ADMIN_ID = 8547003210
+DB_PATH = "poweralert.db"
+
 
 AWAITING_AREA_REPORT, AWAITING_AREA_STATUS, AWAITING_AREA_RESTORED, AWAITING_AREA_SUBSCRIBE = range(4)
 
@@ -133,9 +137,17 @@ async def report_area(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as e:
                 logger.warning("Could not notify " + str(sub_id) + ": " + str(e))
-
+    try:
+        reporter_name = user.username or user.first_name or "Unknown"
+        await context.bot.send_message(
+            ADMIN_ID,
+            "ADMIN ALERT\nNew outage report\nArea: " + area.strip().title() + 
+            "\nReported by: " + reporter_name + 
+            "\nTime: " + datetime.now().strftime("%Y-%m-%d %H:%M")
+        )
+    except Exception as e:
+        logger.warning("Could not notify admin: " + str(e))
     await update.message.reply_text("Outage logged for " + area.strip().title() + ". Thanks for reporting!")
-
 
     return ConversationHandler.END
 
