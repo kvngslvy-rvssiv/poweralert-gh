@@ -237,7 +237,7 @@ async def restored_area(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         logger.warning("Could not notify admin: " + str(e))
 
-        await update.message.reply_text("Marked as restored for " + area.strip().title() + ". Good news!")
+    await update.message.reply_text("Marked as restored for " + area.strip().title() + ". Good news!")
     return ConversationHandler.END
 
 
@@ -305,11 +305,28 @@ async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         await context.bot.send_message(
             reporter_id,
-            "Update from PowerAlert GH team:\n" + update.message.text
+            "Message from PowerAlert GH team:\n" + update.message.text
         )
-        await update.message.reply_text("Sent to reporter.")
+        await update.message.reply_text("Sent.")
     except Exception as e:
         await update.message.reply_text("Could not send: " + str(e))
+
+
+async def relay_to_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    text = update.message.text
+    sender_name = user.username or user.first_name or "Unknown"
+    try:
+        sent = await context.bot.send_message(
+            ADMIN_ID,
+            "MESSAGE FROM CUSTOMER\nFrom: " + sender_name +
+            "\nTime: " + datetime.now().strftime("%Y-%m-%d %H:%M") +
+            "\n\n" + text
+        )
+        save_admin_alert(sent.message_id, user.id, "N/A", "message")
+        await update.message.reply_text("Message sent to the team.")
+    except Exception as e:
+        logger.warning("Could not relay message to admin: " + str(e))
 
 
 def main():
@@ -347,6 +364,7 @@ def main():
 
     app.add_handler(CallbackQueryHandler(quick_reply_handler, pattern="^qr\\|"))
     app.add_handler(MessageHandler(filters.REPLY & filters.User(user_id=ADMIN_ID), admin_reply_handler))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & ~filters.User(user_id=ADMIN_ID), relay_to_admin))
 
     logger.info("PowerAlert GH bot starting...")
     app.run_polling()
