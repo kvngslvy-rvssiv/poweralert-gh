@@ -305,7 +305,8 @@ async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         await context.bot.send_message(
             reporter_id,
-            "Message from PowerAlert GH team:\n" + update.message.text
+            "*Message from PowerAlert GH team:*\n\n" + update.message.text,
+            parse_mode="Markdown"
         )
         await update.message.reply_text("Sent.")
     except Exception as e:
