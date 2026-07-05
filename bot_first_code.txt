@@ -3,25 +3,29 @@ PowerAlert GH - Crowdsourced power outage tracker for Ghana
 Built with python-telegram-bot
 """
 
-import os
 import sqlite3
 import logging
 from datetime import datetime, timedelta
 
-from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     ContextTypes,
     ConversationHandler,
     filters,
 )
 
+import os
+BOT_TOKEN = "8093500509:AAFBbSe_AkWGXI6Bgp2jB6cv0WoDSu7Awk0"
+DB_PATH = "poweralert.db"
+
+import os
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 ADMIN_ID = 8547003210
 DB_PATH = "poweralert.db"
+
 
 AWAITING_AREA_REPORT, AWAITING_AREA_STATUS, AWAITING_AREA_RESTORED, AWAITING_AREA_SUBSCRIBE = range(4)
 
@@ -50,14 +54,6 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
             area TEXT
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS admin_alerts (
-            message_id INTEGER PRIMARY KEY,
-            reporter_id INTEGER,
-            area TEXT,
-            kind TEXT
         )
     """)
     conn.commit()
@@ -105,36 +101,6 @@ def get_subscribers(area):
     return [r[0] for r in rows]
 
 
-def save_admin_alert(message_id, reporter_id, area, kind):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute(
-        "INSERT OR REPLACE INTO admin_alerts (message_id, reporter_id, area, kind) VALUES (?, ?, ?, ?)",
-        (message_id, reporter_id, area, kind)
-    )
-    conn.commit()
-    conn.close()
-
-
-def get_admin_alert(message_id):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT reporter_id, area, kind FROM admin_alerts WHERE message_id = ?", (message_id,))
-    row = c.fetchone()
-    conn.close()
-    return row
-
-
-def quick_reply_keyboard():
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("Received", callback_data="qr|received"),
-            InlineKeyboardButton("Dispatched", callback_data="qr|dispatched"),
-            InlineKeyboardButton("Resolved", callback_data="qr|resolved"),
-        ]
-    ])
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Welcome to PowerAlert GH!\n\n"
@@ -171,21 +137,18 @@ async def report_area(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 )
             except Exception as e:
                 logger.warning("Could not notify " + str(sub_id) + ": " + str(e))
-
     try:
         reporter_name = user.username or user.first_name or "Unknown"
-        sent = await context.bot.send_message(
+        await context.bot.send_message(
             ADMIN_ID,
-            "ADMIN ALERT\nNew outage report\nArea: " + area.strip().title() +
-            "\nReported by: " + reporter_name +
-            "\nTime: " + datetime.now().strftime("%Y-%m-%d %H:%M"),
-            reply_markup=quick_reply_keyboard()
+            "ADMIN ALERT\nNew outage report\nArea: " + area.strip().title() + 
+            "\nReported by: " + reporter_name + 
+            "\nTime: " + datetime.now().strftime("%Y-%m-%d %H:%M")
         )
-        save_admin_alert(sent.message_id, user.id, area.strip().title(), "outage")
     except Exception as e:
         logger.warning("Could not notify admin: " + str(e))
-
     await update.message.reply_text("Outage logged for " + area.strip().title() + ". Thanks for reporting!")
+
     return ConversationHandler.END
 
 
@@ -226,18 +189,16 @@ async def restored_area(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         reporter_name = user.username or user.first_name or "Unknown"
-        sent = await context.bot.send_message(
+        await context.bot.send_message(
             ADMIN_ID,
-            "ADMIN ALERT\nPower restored\nArea: " + area.strip().title() +
-            "\nReported by: " + reporter_name +
-            "\nTime: " + datetime.now().strftime("%Y-%m-%d %H:%M"),
-            reply_markup=quick_reply_keyboard()
+            "ADMIN ALERT\nPower restored\nArea: " + area.strip().title() + 
+            "\nReported by: " + reporter_name + 
+            "\nTime: " + datetime.now().strftime("%Y-%m-%d %H:%M")
         )
-        save_admin_alert(sent.message_id, user.id, area.strip().title(), "restored")
     except Exception as e:
         logger.warning("Could not notify admin: " + str(e))
-
-        await update.message.reply_text("Marked as restored for " + area.strip().title() + ". Good news!")
+        
+    await update.message.reply_text("Marked as restored for " + area.strip().title() + ". Good news!")
     return ConversationHandler.END
 
 
@@ -257,59 +218,6 @@ async def subscribe_area(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Cancelled.")
     return ConversationHandler.END
-
-
-async def quick_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-
-    action = query.data.split("|")[1]
-    message_id = query.message.message_id
-    record = get_admin_alert(message_id)
-
-    if not record:
-        await query.edit_message_reply_markup(reply_markup=None)
-        return
-
-    reporter_id, area, kind = record
-
-    preset_messages = {
-        "received": "Your report for " + area + " has been received by the team.",
-        "dispatched": "A team has been dispatched to check " + area + ".",
-        "resolved": "The issue in " + area + " has been marked as resolved.",
-    }
-    text_to_send = preset_messages.get(action, "Update on your report for " + area + ".")
-
-    try:
-        await context.bot.send_message(reporter_id, text_to_send)
-    except Exception as e:
-        logger.warning("Could not notify reporter: " + str(e))
-
-    try:
-        new_text = query.message.text + "\n\n[Marked: " + action.title() + "]"
-        await query.edit_message_text(new_text, reply_markup=None)
-    except Exception as e:
-        logger.warning("Could not update admin message: " + str(e))
-
-
-async def admin_reply_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    replied_to = update.message.reply_to_message
-    if not replied_to:
-        return
-
-    record = get_admin_alert(replied_to.message_id)
-    if not record:
-        return
-
-    reporter_id, area, kind = record
-    try:
-        await context.bot.send_message(
-            reporter_id,
-            "Update from PowerAlert GH team:\n" + update.message.text
-        )
-        await update.message.reply_text("Sent to reporter.")
-    except Exception as e:
-        await update.message.reply_text("Could not send: " + str(e))
 
 
 def main():
@@ -345,12 +253,10 @@ def main():
     app.add_handler(restored_conv)
     app.add_handler(subscribe_conv)
 
-    app.add_handler(CallbackQueryHandler(quick_reply_handler, pattern="^qr\\|"))
-    app.add_handler(MessageHandler(filters.REPLY & filters.User(user_id=ADMIN_ID), admin_reply_handler))
-
     logger.info("PowerAlert GH bot starting...")
     app.run_polling()
 
 
 if __name__ == "__main__":
     main()
+    
